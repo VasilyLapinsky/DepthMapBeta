@@ -7,9 +7,17 @@ using namespace std;
 using namespace cv;
 using namespace ximgproc;
 
+void showColorMap(const Mat & dispMap)
+{
+	Mat adjMap;
+	dispMap.convertTo(adjMap, CV_8UC1);
+	Mat falseColorsMap;
+	applyColorMap(adjMap, falseColorsMap, cv::COLORMAP_AUTUMN);
+	imshow("Disparity", falseColorsMap);
+	waitKey(1);
+}
 
-
-void makeDisparityMap(Mat image, Mat& disparity_map)
+void makeDisparityMap(const Mat & image, Mat & disparity_map)
 {
 	// Cut main stereo image into two parts
 	Mat left, right;
@@ -26,17 +34,7 @@ void makeDisparityMap(Mat image, Mat& disparity_map)
 	if (max_disp % 16 != 0)
 		max_disp += 16 - (max_disp % 16);
 	// Create filters
-	Ptr<StereoSGBM> left_matcher = StereoSGBM::create(min_disp,   //mindisp
-		max_disp, //numdisp
-		7,   //BlockSize
-		0,   //P1
-		0,   //P2
-		1,   //dispdiffmax
-		0,   //prefiltercap
-		0,   //uniqueness
-		0,   //speckle window size
-		1,   //speckle range
-		cv::StereoSGBM::MODE_SGBM);
+	Ptr<StereoBM> left_matcher = StereoBM::create(32, 15);
 	Ptr<DisparityWLSFilter> wls_filter = createDisparityWLSFilter(left_matcher);
 	Ptr<StereoMatcher> right_matcher = createRightMatcher(left_matcher);
 
@@ -47,11 +45,13 @@ void makeDisparityMap(Mat image, Mat& disparity_map)
 	// Make matrix of disparities
 	Mat left_disparity, norm_left_disparity, right_disparity, norm_right_disparity;
 	left_matcher->compute(left_for_matcher, right_for_matcher, left_disparity);
-	right_matcher->compute(left_for_matcher, right_for_matcher, right_disparity);
+	right_matcher->compute(right_for_matcher, left_for_matcher, right_disparity);
 
 	// Make wls filter
 	Mat filtered_image;
 	wls_filter->filter(left_disparity, left_for_matcher, filtered_image, right_disparity);
+
+	showColorMap(filtered_image);
 
 	// Convert disparity map into grayscale image
 	getDisparityVis(filtered_image, disparity_map, 16);
